@@ -1,0 +1,9 @@
+/vendor/
+/node_modules/
+.env
+.env.*
+!.env.example
+/coverage/
+*.log
+.DS_Store
+.php-cs-fixer.cache
