@@ -3,6 +3,7 @@
 .env
 .env.*
 !.env.example
+deploy.conf
 *.log
 .php-cs-fixer.cache
 .phpunit.result.cache

@@ -1,0 +1,39 @@
+# Copy this file to deploy.conf and fill in real values.
+# Never commit deploy.conf with real credentials — it is gitignored on purpose.
+#
+# Used by bin/deploy.sh to push a built release to a shared-hosting target
+# over SSH/SFTP with a password (see README.md's "Automated redeploys with
+# bin/deploy.sh" section for the full workflow and safety mechanisms).
+
+# --- Connection ---
+# Hostname or IP address of the shared-hosting server.
+DEPLOY_HOST=example.com
+# SSH/SFTP port (shared hosts commonly use 22, but some assign a custom port).
+DEPLOY_PORT=22
+# Username for the SSH session used to run remote commands (backup/migrate/health-check).
+DEPLOY_SSH_USER=changeme
+# Password for the SSH user above. Used non-interactively via sshpass.
+DEPLOY_SSH_PASS=changeme
+# Username for the SFTP session used to upload the release. Usually the same
+# as DEPLOY_SSH_USER — override only if the host issues separate SFTP-only credentials.
+DEPLOY_SFTP_USER=changeme
+# Password for the SFTP user above. Used non-interactively via sshpass.
+DEPLOY_SFTP_PASS=changeme
+
+# --- Remote layout ---
+# Remote directory whose public/ subdirectory is the web server's document root.
+# This is where the staged release is uploaded and where the previous release
+# is backed up from before each deploy.
+DEPLOY_REMOTE_PATH=/home/changeme/homebrewing
+# PHP CLI binary to invoke on the remote host when running bin/migrate.php
+# (shared hosts often expose a version-suffixed binary, e.g. php8.3).
+DEPLOY_REMOTE_PHP_BIN=php
+
+# --- Safety / rollback ---
+# Number of timestamped backup directories to retain on the remote host
+# before older ones are pruned.
+DEPLOY_BACKUP_KEEP=5
+# Optional: a URL to curl after migrations run. A non-2xx response triggers
+# an automatic rollback to the previous release. Leave blank to skip the
+# health check (and automatic rollback) entirely.
+DEPLOY_HEALTHCHECK_URL=

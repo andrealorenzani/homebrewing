@@ -1,0 +1,202 @@
+/*
+ * Base functional stylesheet for the Homebrewing app.
+ *
+ * Deliberately plain/utilitarian, not the ornate "parchment/journal" diary
+ * theme (that is explicitly out of scope for v1.0.1 — see docs/plans).
+ */
+
+:root {
+    --color-bg: #f7f7f5;
+    --color-surface: #ffffff;
+    --color-border: #dcdcd6;
+    --color-text: #23231f;
+    --color-muted: #6b6b63;
+    --color-accent: #7a4a2b;
+    --color-accent-contrast: #ffffff;
+    --radius: 6px;
+    --spacing: 1rem;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    line-height: 1.5;
+}
+
+.container {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 var(--spacing);
+}
+
+a {
+    color: var(--color-accent);
+}
+
+/* --- Header / nav --- */
+
+.site-header {
+    background-color: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.site-header__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+.brand {
+    font-weight: 700;
+    font-size: 1.25rem;
+    text-decoration: none;
+    color: var(--color-text);
+}
+
+.main-nav {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.nav-link {
+    text-decoration: none;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.nav-link:hover {
+    color: var(--color-accent);
+}
+
+.nav-logout-form {
+    margin: 0;
+    display: inline;
+}
+
+.nav-link--button {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.nav-link--button:hover {
+    color: var(--color-accent);
+    opacity: 1;
+}
+
+/* --- Layout --- */
+
+main.container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    min-height: 60vh;
+}
+
+.site-footer {
+    border-top: 1px solid var(--color-border);
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    padding: 1.5rem 0;
+}
+
+/* --- Card grid (homepage recipe showcase, own-listing views) --- */
+
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+}
+
+.card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+
+.card-title {
+    margin: 0 0 0.5rem;
+    font-size: 1.1rem;
+}
+
+.card-meta {
+    margin: 0;
+    color: var(--color-muted);
+    text-transform: capitalize;
+    font-size: 0.9rem;
+}
+
+.empty-state {
+    color: var(--color-muted);
+    font-style: italic;
+}
+
+/* --- Forms --- */
+
+label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+select,
+textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font: inherit;
+    margin-bottom: 1rem;
+}
+
+button,
+.btn {
+    display: inline-block;
+    background-color: var(--color-accent);
+    color: var(--color-accent-contrast);
+    border: none;
+    border-radius: var(--radius);
+    padding: 0.6rem 1.2rem;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+button:hover,
+.btn:hover {
+    opacity: 0.9;
+}
+
+.btn-secondary {
+    background-color: transparent;
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+
+.form-errors {
+    color: #a33a2b;
+    background-color: #fbecea;
+    border: 1px solid #e3b0a7;
+    border-radius: var(--radius);
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 1rem;
+}

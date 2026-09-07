@@ -1,0 +1,38 @@
+# Local dev/test MySQL for the homebrewing app (v1.0.1 plan, task V4).
+#
+# The host also runs a system MariaDB on 127.0.0.1:3306 that we do not have
+# credentials for, so this maps the container's 3306 to host port 3307
+# instead. Adjust HOST DB_PORT values in .env / .env.testing accordingly if
+# you change this mapping.
+#
+# Usage:
+#   docker compose up -d          # start (creates the named volume on first run)
+#   docker compose down           # stop, keep data
+#   docker compose down -v        # stop and wipe the database entirely
+#
+# First boot only, MySQL's entrypoint runs docker/mysql-init/01-init.sql,
+# which creates the homebrewing_test database and grants the homebrewing
+# user privileges on both homebrewing_dev and homebrewing_test.
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: homebrewing-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: homebrewing_root_dev_pw
+      MYSQL_DATABASE: homebrewing_dev
+      MYSQL_USER: homebrewing
+      MYSQL_PASSWORD: homebrewing_dev_pw
+    ports:
+      - "3307:3306"
+    volumes:
+      - homebrewing-mysql-data:/var/lib/mysql
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-phomebrewing_root_dev_pw"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  homebrewing-mysql-data:
