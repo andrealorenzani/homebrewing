@@ -2,7 +2,7 @@
     "name": "homebrewing/web",
     "description": "Homebrewing hobby web app (recipes, batches, sharing).",
     "type": "project",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "license": "proprietary",
     "require": {
         "php": ">=8.1",

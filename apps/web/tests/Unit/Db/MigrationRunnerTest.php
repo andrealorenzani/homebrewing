@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Db;
 
+use App\Db\DbInterface;
 use App\Db\FakeDb;
+use App\Db\IncompatibleMigrationsTableException;
 use App\Db\MigrationRunner;
+use App\Db\PdoDb;
+use PDO;
 use Tests\TestCase;
 
 final class MigrationRunnerTest extends TestCase
@@ -200,5 +204,102 @@ final class MigrationRunnerTest extends TestCase
         // Running again against the now-populated schema_migrations table
         // (seeded via the migration's own INSERT statements) is a no-op.
         $this->assertSame([], $runner->migrate());
+    }
+
+    public function testAppliedVersionsThrowsIncompatibleMigrationsTableExceptionOnIncompatibleTable(): void
+    {
+        // Regression test for a real production incident: a pre-existing
+        // `schema_migrations` table from another application, sharing the
+        // same database, that has an incompatible structure (here, missing
+        // the `version` column entirely) makes MySQL raise "Unknown column
+        // 'version' in 'field list'". Reproduced here with a real SQLite
+        // in-memory PdoDb so the underlying exception is a genuine
+        // \PDOException, not a stand-in, matching PdoDbTest.php's
+        // precedent for real-PDO-exception-shaped tests.
+        $pdo = new PDO('sqlite::memory:');
+        $db = new PdoDb($pdo);
+        $db->execute('CREATE TABLE schema_migrations (id INTEGER PRIMARY KEY, name TEXT)');
+        $runner = new MigrationRunner($db, $this->migrationsDir);
+
+        try {
+            $runner->appliedVersions();
+            $this->fail('Expected IncompatibleMigrationsTableException to be thrown.');
+        } catch (IncompatibleMigrationsTableException $e) {
+            $this->assertStringContainsString('dedicated database', $e->getMessage());
+            $this->assertInstanceOf(\PDOException::class, $e->getPrevious());
+        }
+    }
+
+    public function testAppliedVersionsWrapsAnyPdoExceptionRegardlessOfDbImplementation(): void
+    {
+        // Secondary, isolation-focused test against a pure DbInterface
+        // double (precedented in RouterTest.php's anonymous-class doubles)
+        // rather than SQLite specifics, so the wrapping behavior is proven
+        // independently of any particular driver's error message wording.
+        $runner = new MigrationRunner($this->makeDbThrowingOnFetchAll(), $this->migrationsDir);
+
+        try {
+            $runner->appliedVersions();
+            $this->fail('Expected IncompatibleMigrationsTableException to be thrown.');
+        } catch (IncompatibleMigrationsTableException $e) {
+            $this->assertStringContainsString('incompatible structure', $e->getMessage());
+            $this->assertInstanceOf(\PDOException::class, $e->getPrevious());
+        }
+    }
+
+    public function testMigrateThrowsIncompatibleMigrationsTableExceptionOnIncompatibleTable(): void
+    {
+        // migrate() calls ensureMigrationsTableExists() first (a no-op on
+        // this double's execute()), then funnels through
+        // pendingMigrations() -> appliedVersions(), where the failure
+        // surfaces. Uses the DbInterface double rather than SQLite because
+        // ensureMigrationsTableExists()'s MySQL-specific DDL (AUTO_INCREMENT,
+        // ENGINE=InnoDB) isn't valid SQLite syntax and would fail there
+        // regardless of the schema_migrations table's pre-existing shape.
+        $runner = new MigrationRunner($this->makeDbThrowingOnFetchAll(), $this->migrationsDir);
+
+        $this->expectException(IncompatibleMigrationsTableException::class);
+        $runner->migrate();
+    }
+
+    private function makeDbThrowingOnFetchAll(): DbInterface
+    {
+        return new class implements DbInterface {
+            public function fetchAll(string $sql, array $params = []): array
+            {
+                throw new \PDOException("SQLSTATE[42S22]: Column not found: 1054 Unknown column 'version' in 'field list'");
+            }
+
+            public function fetchOne(string $sql, array $params = []): ?array
+            {
+                return null;
+            }
+
+            public function execute(string $sql, array $params = []): void
+            {
+            }
+
+            public function lastInsertId(): string
+            {
+                return '0';
+            }
+
+            public function inTransaction(): bool
+            {
+                return false;
+            }
+
+            public function beginTransaction(): void
+            {
+            }
+
+            public function commit(): void
+            {
+            }
+
+            public function rollBack(): void
+            {
+            }
+        };
     }
 }

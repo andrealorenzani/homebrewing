@@ -39,10 +39,24 @@ final class MigrationRunner
 
     /**
      * @return list<string> versions already recorded as applied
+     *
+     * @throws IncompatibleMigrationsTableException when a pre-existing
+     *         `schema_migrations` table has an incompatible structure
+     *         (typically because the configured database is shared with
+     *         another application instead of being dedicated to this one)
      */
     public function appliedVersions(): array
     {
-        $rows = $this->db->fetchAll('SELECT version FROM schema_migrations ORDER BY version ASC');
+        try {
+            $rows = $this->db->fetchAll('SELECT version FROM schema_migrations ORDER BY version ASC');
+        } catch (\PDOException $e) {
+            throw new IncompatibleMigrationsTableException(
+                'A "schema_migrations" table already exists but has an incompatible structure. ' .
+                'This usually means the configured database is shared with another application. ' .
+                'This app requires a dedicated database; no automatic fix was attempted.',
+                previous: $e,
+            );
+        }
 
         return array_map(static fn (array $row): string => (string) $row['version'], $rows);
     }

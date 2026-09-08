@@ -211,6 +211,22 @@ Set the domain's (or subdomain's) document root to `apps/web/public`, **not**
 the front controller and static assets; everything else (`src/`, `templates/`,
 `.env`, `vendor/`, etc.) should stay outside the web-accessible tree.
 
+#### Apache rewrite (`.htaccess`)
+
+`apps/web/public/.htaccess` is already committed and requires no manual
+setup beyond completing step 6 above as normal: it serves real files/
+directories (e.g. `public/css/`) directly and routes every other request
+through `index.php`, which is required on Apache-based hosts (the common
+case for shared hosting) since Apache has no built-in fallback-to-script
+behavior the way PHP's built-in development server does. It relies on
+`mod_rewrite` and on `AllowOverride` being permitted for this directory,
+both of which are enabled by default on most hosts.
+
+**Troubleshooting:** if the homepage loads but every other route 404s,
+your host likely has `AllowOverride` disabled for this directory; ask your
+host to enable it, or ask them to add the equivalent rewrite block to the
+site's main vhost config.
+
 ### Automated redeploys with `bin/deploy.sh`
 
 `apps/web/bin/deploy.sh` automates three of the six manual steps above for

@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 // Front controller: every request is routed through here (configure the
-// webserver's document root at apps/web/public and, for Apache/shared
-// hosting without pretty-URL rewriting configured yet, rely on the
-// PHP built-in server or a future .htaccess rewrite to funnel requests
-// here).
+// webserver's document root at apps/web/public). On Apache/shared hosting,
+// the committed .htaccess in this directory funnels every request that
+// isn't a real file/directory through this script (requires mod_rewrite
+// and AllowOverride to be enabled — see the README's deployment section).
+// PHP's built-in development server (`php -S`) needs no such file: it has
+// its own built-in fallback-to-script behavior and ignores .htaccess
+// entirely.
 
 require __DIR__ . '/../vendor/autoload.php';
 

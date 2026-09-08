@@ -2,6 +2,35 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.3 — 2026-09-08
+
+Bug-fix release. Both fixes were discovered during the user's first real
+production deploy to shared hosting, not new feature work — the app's
+behavior is otherwise unchanged from 1.0.2.
+
+Fixed:
+
+- Missing `apps/web/public/.htaccess`: on Apache-based hosts (the common
+  case for shared hosting), every route other than the homepage
+  (`/register`, `/login`, etc.) returned a raw Apache 404 instead of
+  reaching the app's router, because Apache has no built-in
+  fallback-to-`index.php` behavior the way PHP's `php -S` dev server does.
+  The homepage worked only because Apache's `DirectoryIndex` serves
+  `index.php` for a bare directory request. Added the standard
+  front-controller rewrite file (serves real files/directories directly,
+  routes everything else through `index.php`), verified end to end against
+  a real Apache container.
+- `MigrationRunner` now throws a clear, actionable
+  `IncompatibleMigrationsTableException` — instead of a cryptic raw
+  `PDOException` — when the configured database already has a
+  pre-existing `schema_migrations` table with an incompatible structure
+  (for example, a database shared with another application). No auto-fix
+  is attempted; the goal is a loud, clear failure instead of a confusing
+  one.
+
+Explicitly not included in this release: no new application features,
+templates, routes, or database schema changes.
+
 ## 1.0.2 — 2026-09-07
 
 Ops/release-engineering tooling release. No application/user-facing

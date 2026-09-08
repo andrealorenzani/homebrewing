@@ -1,0 +1,28 @@
+# Front-controller rewrite for Apache-based hosts (most shared hosting).
+#
+# public/index.php is meant to handle every request that isn't a real file
+# or directory under this document root (static assets like css/ are served
+# directly). Apache has no built-in fallback-to-script behavior the way
+# PHP's built-in server (`php -S`) does, so without this file every route
+# except "/" (served via DirectoryIndex) returns a raw Apache 404 instead
+# of ever reaching the router.
+#
+# Requires mod_rewrite to be enabled and AllowOverride to permit rewrite
+# directives for this directory (AllowOverride All, or at least
+# "AllowOverride FileInfo"/"AllowOverride All" including "Limit"/"Options"
+# as needed) — see the README's deployment section for the troubleshooting
+# note if a host has this disabled by default.
+
+RewriteEngine On
+
+# Serve real files and directories (e.g. css/app.css) directly, without
+# routing them through index.php.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Everything else (registration, login, recipes, diaries, healthz, etc.)
+# is funneled through the front controller. mod_rewrite preserves the
+# original QUERY_STRING automatically since no explicit target query
+# string is given here.
+RewriteRule ^ index.php [L]
