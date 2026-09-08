@@ -13,6 +13,7 @@ use App\Recipes\RecipeIngredientRepository;
 use App\Recipes\RecipeRepository;
 use App\Recipes\RecipeService;
 use App\View\Renderer;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 final class RecipeControllerTest extends TestCase
@@ -32,6 +33,23 @@ final class RecipeControllerTest extends TestCase
     private function authedRequest(string $method, string $path, array $body = [], int $userId = 1): Request
     {
         return Request::create($method, $path, [], $body)->withAttribute('auth_user_id', $userId);
+    }
+
+    /**
+     * Extracts only the live, rendered `#ingredient-rows` section of the
+     * form (excluding the inert `<template id="ingredient-row-template">`
+     * clone-source block, which also contains an
+     * `name="ingredient_name[]"` field and would otherwise be
+     * double-counted by naive substring counting).
+     */
+    private function extractIngredientRowsSection(string $html): string
+    {
+        $start = strpos($html, '<div id="ingredient-rows">');
+        $end = strpos($html, '<template id="ingredient-row-template">');
+        $this->assertIsInt($start, 'Expected #ingredient-rows container to be present.');
+        $this->assertIsInt($end, 'Expected ingredient-row-template to be present.');
+
+        return substr($html, $start, $end - $start);
     }
 
     public function testListOwnRendersOnlyOwnRecipes(): void
@@ -56,6 +74,121 @@ final class RecipeControllerTest extends TestCase
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertStringContainsString('<form', $response->getBody());
+    }
+
+    public function testShowCreateFormHasNoFreeTextUnitOrTypeInputs(): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->showCreateForm($this->authedRequest('GET', '/recipes/new'));
+        $body = $response->getBody();
+
+        foreach (['batch_size_unit', 'water_unit', 'sugar_unit', 'sugar_type', 'yeast_unit', 'yeast_type', 'ingredient_unit'] as $field) {
+            $this->assertStringNotContainsString(
+                'type="text" id="' . $field,
+                $body,
+                "Expected no free-text input for {$field}.",
+            );
+        }
+    }
+
+    public function testShowCreateFormRendersSelectsForAllConstrainedFields(): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->showCreateForm($this->authedRequest('GET', '/recipes/new'));
+        $body = $response->getBody();
+
+        $this->assertStringContainsString('<select id="batch_size_unit" name="batch_size_unit">', $body);
+        $this->assertStringContainsString('<select id="water_unit" name="water_unit">', $body);
+        $this->assertStringContainsString('<select id="sugar_unit" name="sugar_unit">', $body);
+        $this->assertStringContainsString('<select id="sugar_type" name="sugar_type">', $body);
+        $this->assertStringContainsString('<select id="yeast_unit" name="yeast_unit">', $body);
+        $this->assertStringContainsString('<select id="yeast_type" name="yeast_type">', $body);
+        $this->assertStringContainsString('name="ingredient_unit[]"', $body);
+
+        // Spot-check that the actual constant values populate the options.
+        $this->assertStringContainsString('value="L"', $body);
+        $this->assertStringContainsString('value="dextrose"', $body);
+        $this->assertStringContainsString('value="packet"', $body);
+        $this->assertStringContainsString('value="ale"', $body);
+    }
+
+    public function testShowCreateFormHasCompactGroupedRowMarkup(): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->showCreateForm($this->authedRequest('GET', '/recipes/new'));
+        $body = $response->getBody();
+
+        $rowCount = substr_count($body, 'class="quantity-unit-row"');
+        $this->assertSame(5, $rowCount, 'Expected 5 grouped rows: batch size, water, sugar, yeast, OG/FG.');
+        $this->assertStringContainsString('class="field-hint"', $body);
+    }
+
+    public function testShowCreateFormHasOgFgConstraintsAndAbvOutput(): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->showCreateForm($this->authedRequest('GET', '/recipes/new'));
+        $body = $response->getBody();
+
+        $this->assertStringContainsString(
+            'type="number"',
+            $body,
+        );
+        $this->assertMatchesRegularExpression(
+            '/id="target_og"[^>]*step="0\.001"[^>]*min="0\.990"[^>]*max="1\.300"/s',
+            $body,
+        );
+        $this->assertMatchesRegularExpression(
+            '/id="target_fg"[^>]*step="0\.001"[^>]*min="0\.990"[^>]*max="1\.300"/s',
+            $body,
+        );
+        $this->assertStringContainsString('id="abv-estimate"', $body);
+    }
+
+    public function testShowCreateFormHasAddIngredientButtonAndScriptTag(): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->showCreateForm($this->authedRequest('GET', '/recipes/new'));
+        $body = $response->getBody();
+
+        $this->assertStringContainsString('<button type="button" id="add-ingredient-row"', $body);
+        $this->assertStringContainsString('<script src="/js/recipe-form.js" defer></script>', $body);
+    }
+
+    public function testShowCreateFormRendersExactlyThreeBlankIngredientRows(): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->showCreateForm($this->authedRequest('GET', '/recipes/new'));
+
+        $section = $this->extractIngredientRowsSection($response->getBody());
+        $rowCount = substr_count($section, 'name="ingredient_name[]"');
+        $this->assertSame(3, $rowCount);
+    }
+
+    public function testShowEditFormRendersAllIngredientsWhenMoreThanThreeExist(): void
+    {
+        $db = new FakeDb();
+        $controller = $this->makeController($db);
+        $controller->create($this->authedRequest('POST', '/recipes', [
+            'name' => 'Big Brew',
+            'category' => 'beer',
+            'ingredient_name' => ['Malt', 'Hops', 'Yeast', 'Sugar', 'Fruit'],
+            'ingredient_type' => ['grain', 'hop', 'other', 'other', 'fruit'],
+        ]));
+
+        $request = $this->authedRequest('GET', '/recipes/1/edit', [], 1)->withRouteParams(['id' => '1']);
+        $response = $controller->showEditForm($request);
+
+        $section = $this->extractIngredientRowsSection($response->getBody());
+        $rowCount = substr_count($section, 'name="ingredient_name[]"');
+        $this->assertSame(5, $rowCount);
+        $this->assertStringContainsString('value="Malt"', $response->getBody());
+        $this->assertStringContainsString('value="Fruit"', $response->getBody());
     }
 
     public function testCreateWithValidDataRedirectsToShowPage(): void
@@ -109,6 +242,186 @@ final class RecipeControllerTest extends TestCase
 
         $rows = (new RecipeIngredientRepository($db))->findAllByRecipeId(1);
         $this->assertSame('other', $rows[0]['ingredient_type']);
+    }
+
+    /**
+     * @return list<array{0: string, 1: string}>
+     */
+    public static function invalidConstrainedFieldProvider(): array
+    {
+        return [
+            'batch_size_unit' => ['batch_size_unit', 'not-a-real-unit'],
+            'water_unit' => ['water_unit', 'not-a-real-unit'],
+            'sugar_unit' => ['sugar_unit', 'not-a-real-unit'],
+            'sugar_type' => ['sugar_type', 'not-a-real-type'],
+            'yeast_unit' => ['yeast_unit', 'not-a-real-unit'],
+            'yeast_type' => ['yeast_type', 'not-a-real-type'],
+        ];
+    }
+
+    #[DataProvider('invalidConstrainedFieldProvider')]
+    public function testCreateWithInvalidConstrainedFieldFallsBackToNull(string $field, string $invalidValue): void
+    {
+        $db = new FakeDb();
+        $controller = $this->makeController($db);
+
+        $controller->create($this->authedRequest('POST', '/recipes', [
+            'name' => 'Mystery Brew',
+            'category' => 'beer',
+            $field => $invalidValue,
+        ]));
+
+        $row = (new RecipeRepository($db))->findById(1);
+        $this->assertNull($row[$field]);
+    }
+
+    public function testCreateWithInvalidIngredientUnitFallsBackToNull(): void
+    {
+        $db = new FakeDb();
+        $controller = $this->makeController($db);
+
+        $controller->create($this->authedRequest('POST', '/recipes', [
+            'name' => 'Mystery Brew',
+            'category' => 'beer',
+            'ingredient_name' => ['Mystery Item'],
+            'ingredient_type' => ['other'],
+            'ingredient_unit' => ['not-a-real-unit'],
+        ]));
+
+        $rows = (new RecipeIngredientRepository($db))->findAllByRecipeId(1);
+        $this->assertNull($rows[0]['unit']);
+    }
+
+    public function testCreateWithValidConstrainedFieldsPersistsThem(): void
+    {
+        $db = new FakeDb();
+        $controller = $this->makeController($db);
+
+        $controller->create($this->authedRequest('POST', '/recipes', [
+            'name' => 'Valid Brew',
+            'category' => 'beer',
+            'batch_size_unit' => 'L',
+            'water_unit' => 'L',
+            'sugar_unit' => 'g',
+            'sugar_type' => 'dextrose',
+            'yeast_unit' => 'packet',
+            'yeast_type' => 'ale',
+        ]));
+
+        $row = (new RecipeRepository($db))->findById(1);
+        $this->assertSame('L', $row['batch_size_unit']);
+        $this->assertSame('L', $row['water_unit']);
+        $this->assertSame('g', $row['sugar_unit']);
+        $this->assertSame('dextrose', $row['sugar_type']);
+        $this->assertSame('packet', $row['yeast_unit']);
+        $this->assertSame('ale', $row['yeast_type']);
+    }
+
+    /**
+     * @return list<array{0: string}>
+     */
+    public static function validGravityValueProvider(): array
+    {
+        return [
+            'min boundary' => ['0.990'],
+            'max boundary' => ['1.300'],
+        ];
+    }
+
+    #[DataProvider('validGravityValueProvider')]
+    public function testCreateWithGravityAtBoundaryIsAccepted(string $value): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->create($this->authedRequest('POST', '/recipes', [
+            'name' => 'Boundary Brew',
+            'category' => 'beer',
+            'target_og' => $value,
+            'target_fg' => $value,
+        ]));
+
+        $this->assertSame(302, $response->getStatusCode());
+    }
+
+    /**
+     * @return list<array{0: string}>
+     */
+    public static function invalidGravityValueProvider(): array
+    {
+        return [
+            'below min' => ['0.989'],
+            'above max' => ['1.301'],
+        ];
+    }
+
+    #[DataProvider('invalidGravityValueProvider')]
+    public function testCreateWithOutOfRangeTargetOgIsRejected(string $value): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->create($this->authedRequest('POST', '/recipes', [
+            'name' => 'Out Of Range Brew',
+            'category' => 'beer',
+            'target_og' => $value,
+        ]));
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertStringContainsString('Target OG must be between', $response->getBody());
+    }
+
+    #[DataProvider('invalidGravityValueProvider')]
+    public function testCreateWithOutOfRangeTargetFgIsRejected(string $value): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->create($this->authedRequest('POST', '/recipes', [
+            'name' => 'Out Of Range Brew',
+            'category' => 'beer',
+            'target_fg' => $value,
+        ]));
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertStringContainsString('Target FG must be between', $response->getBody());
+    }
+
+    public function testCreateWithNonNumericTargetOgIsRejected(): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->create($this->authedRequest('POST', '/recipes', [
+            'name' => 'Not A Number Brew',
+            'category' => 'beer',
+            'target_og' => 'not-a-number',
+        ]));
+
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertStringContainsString('Target OG must be a number', $response->getBody());
+    }
+
+    public function testCreateWithEmptyTargetOgAndFgIsAccepted(): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->create($this->authedRequest('POST', '/recipes', [
+            'name' => 'No Gravity Brew',
+            'category' => 'beer',
+            'target_og' => '',
+            'target_fg' => '',
+        ]));
+
+        $this->assertSame(302, $response->getStatusCode());
+    }
+
+    public function testCreateWithAbsentTargetOgAndFgIsAccepted(): void
+    {
+        $controller = $this->makeController(new FakeDb());
+
+        $response = $controller->create($this->authedRequest('POST', '/recipes', [
+            'name' => 'No Gravity Fields Brew',
+            'category' => 'beer',
+        ]));
+
+        $this->assertSame(302, $response->getStatusCode());
     }
 
     public function testCreatePersistsIngredientRows(): void

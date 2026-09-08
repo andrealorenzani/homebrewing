@@ -229,7 +229,7 @@ site's main vhost config.
 
 ### Automated redeploys with `bin/deploy.sh`
 
-`apps/web/bin/deploy.sh` automates three of the six manual steps above for
+`bin/deploy.sh` (run from the repository root) automates three of the six manual steps above for
 hosts that offer SSH/SFTP access: **step 1** (get the code onto the server),
 **step 2** (install PHP dependencies — done locally via a staged copy and
 `composer install --no-dev --optimize-autoloader`, then uploaded), and
@@ -303,8 +303,9 @@ shell when the file is sourced.
 
 #### Usage
 
+Run from the repository root:
+
 ```bash
-cd apps/web
 bin/deploy.sh --help        # show usage and exit
 bin/deploy.sh --dry-run     # print the full plan; zero network activity
 bin/deploy.sh --stage-only  # build the local release copy and stop (debug)

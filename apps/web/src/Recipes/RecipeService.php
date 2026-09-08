@@ -23,6 +23,22 @@ final class RecipeService
     /** @var list<string> */
     public const INGREDIENT_TYPES = ['fruit', 'grain', 'hop', 'other'];
 
+    /** @var list<string> */
+    public const UNITS = ['L', 'mL', 'gal', 'qt', 'kg', 'g', 'lb', 'oz'];
+
+    /** @var list<string> */
+    public const YEAST_UNITS = ['packet', 'g', 'mL'];
+
+    /** @var list<string> */
+    public const SUGAR_TYPES = ['table_sugar', 'dextrose', 'honey', 'dme', 'lme', 'other'];
+
+    /** @var list<string> */
+    public const YEAST_TYPES = ['ale', 'lager', 'wine', 'champagne', 'wild', 'other'];
+
+    public const TARGET_GRAVITY_MIN = 0.990;
+
+    public const TARGET_GRAVITY_MAX = 1.300;
+
     public function __construct(
         private readonly DbInterface $db,
         private readonly RecipeRepository $recipes,

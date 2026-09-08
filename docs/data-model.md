@@ -65,6 +65,20 @@ Indexes: `idx_recipes_user_id (user_id)`,
 `idx_recipes_is_public_updated_at (is_public, updated_at)` (supports the
 homepage's "most recently updated public recipes" query).
 
+`batch_size_unit`/`water_unit`/`sugar_unit`/`yeast_unit`/`sugar_type`/
+`yeast_type` are plain nullable `VARCHAR` columns with **no database-level
+`ENUM`** — unlike `category` above, their closed-list constraint (see
+`RecipeService::UNITS`/`YEAST_UNITS`/`SUGAR_TYPES`/`YEAST_TYPES` in
+`code-structure.md`) is enforced only in the application layer
+(`RecipeController`), by design (see `business-logic.md`). An invalid or
+out-of-list value submitted through the app is stored as `NULL`, not
+rejected at the database level; a value written by another means (a direct
+`INSERT`, or one saved before the closed list existed) can still contain
+arbitrary text these columns' own type permits. `target_og`/`target_fg` are
+likewise unconstrained at the database level (`DECIMAL(6,3)` accepts any
+value the type permits) — the 0.990–1.300 range is an application-layer rule
+enforced in `RecipeController::validateRecipe()`, not a `CHECK` constraint.
+
 `BOOLEAN` is stored by MySQL 8.0 as `tinyint(1)`; `is_public` is confirmed
 `NOT NULL`, `tinyint`, `DEFAULT 0` against the live Dockerized database (see
 `test-suites.md`).

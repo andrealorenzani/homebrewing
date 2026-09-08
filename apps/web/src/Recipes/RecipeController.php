@@ -21,7 +21,7 @@ use App\View\Renderer;
  */
 final class RecipeController
 {
-    private const MIN_INGREDIENT_ROWS = 6;
+    private const MIN_INGREDIENT_ROWS = 3;
 
     public function __construct(
         private readonly RecipeService $recipes,
@@ -187,6 +187,10 @@ final class RecipeController
             'ingredientRows' => $this->buildIngredientRows($ingredients),
             'categories' => RecipeService::CATEGORIES,
             'ingredientTypes' => RecipeService::INGREDIENT_TYPES,
+            'units' => RecipeService::UNITS,
+            'yeastUnits' => RecipeService::YEAST_UNITS,
+            'sugarTypes' => RecipeService::SUGAR_TYPES,
+            'yeastTypes' => RecipeService::YEAST_TYPES,
         ], $status);
     }
 
@@ -244,15 +248,15 @@ final class RecipeController
             'category' => $category,
             'description' => $this->nullableString($request->getBodyParam('description')),
             'batch_size' => $this->nullableNumeric($request->getBodyParam('batch_size')),
-            'batch_size_unit' => $this->nullableString($request->getBodyParam('batch_size_unit')),
+            'batch_size_unit' => $this->nullableInList($request->getBodyParam('batch_size_unit'), RecipeService::UNITS),
             'water_quantity' => $this->nullableNumeric($request->getBodyParam('water_quantity')),
-            'water_unit' => $this->nullableString($request->getBodyParam('water_unit')),
+            'water_unit' => $this->nullableInList($request->getBodyParam('water_unit'), RecipeService::UNITS),
             'sugar_quantity' => $this->nullableNumeric($request->getBodyParam('sugar_quantity')),
-            'sugar_unit' => $this->nullableString($request->getBodyParam('sugar_unit')),
-            'sugar_type' => $this->nullableString($request->getBodyParam('sugar_type')),
-            'yeast_type' => $this->nullableString($request->getBodyParam('yeast_type')),
+            'sugar_unit' => $this->nullableInList($request->getBodyParam('sugar_unit'), RecipeService::UNITS),
+            'sugar_type' => $this->nullableInList($request->getBodyParam('sugar_type'), RecipeService::SUGAR_TYPES),
+            'yeast_type' => $this->nullableInList($request->getBodyParam('yeast_type'), RecipeService::YEAST_TYPES),
             'yeast_quantity' => $this->nullableNumeric($request->getBodyParam('yeast_quantity')),
-            'yeast_unit' => $this->nullableString($request->getBodyParam('yeast_unit')),
+            'yeast_unit' => $this->nullableInList($request->getBodyParam('yeast_unit'), RecipeService::YEAST_UNITS),
             'target_og' => $this->nullableNumeric($request->getBodyParam('target_og')),
             'target_fg' => $this->nullableNumeric($request->getBodyParam('target_fg')),
             'notes' => $this->nullableString($request->getBodyParam('notes')),
@@ -289,7 +293,7 @@ final class RecipeController
                 'ingredient_type' => $type,
                 'name' => $name,
                 'quantity' => $this->nullableNumeric($quantities[$i] ?? null),
-                'unit' => $this->nullableString($units[$i] ?? null),
+                'unit' => $this->nullableInList($units[$i] ?? null, RecipeService::UNITS),
                 'timing_note' => $this->nullableString($timingNotes[$i] ?? null),
             ];
         }
@@ -306,6 +310,31 @@ final class RecipeController
 
         if ($data['name'] === '') {
             $errors['name'] = 'Name is required.';
+        }
+
+        foreach (['target_og' => 'Target OG', 'target_fg' => 'Target FG'] as $field => $label) {
+            $value = $data[$field];
+
+            if ($value === null) {
+                continue;
+            }
+
+            if (!is_numeric($value)) {
+                $errors[$field] = "{$label} must be a number.";
+
+                continue;
+            }
+
+            $numeric = (float) $value;
+
+            if ($numeric < RecipeService::TARGET_GRAVITY_MIN || $numeric > RecipeService::TARGET_GRAVITY_MAX) {
+                $errors[$field] = sprintf(
+                    '%s must be between %.3f and %.3f.',
+                    $label,
+                    RecipeService::TARGET_GRAVITY_MIN,
+                    RecipeService::TARGET_GRAVITY_MAX,
+                );
+            }
         }
 
         return $errors;
@@ -329,5 +358,19 @@ final class RecipeController
         }
 
         return (string) $value;
+    }
+
+    /**
+     * @param list<string> $allowed
+     */
+    private function nullableInList(mixed $value, array $allowed): ?string
+    {
+        $value = $this->nullableString($value);
+
+        if ($value === null || !in_array($value, $allowed, true)) {
+            return null;
+        }
+
+        return $value;
     }
 }

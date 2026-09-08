@@ -5,11 +5,11 @@
 # Builds a production-ready copy of apps/web (composer install --no-dev),
 # backs up the current remote release, uploads the new one via SFTP, runs
 # the remote migration runner, and optionally rolls back automatically if a
-# post-deploy health check fails. Configuration lives in deploy.conf (copy
-# deploy.conf.example to deploy.conf and fill in real values — never commit
-# deploy.conf, it is gitignored on purpose).
+# post-deploy health check fails. Configuration lives in apps/web/deploy.conf
+# (copy apps/web/deploy.conf.example to apps/web/deploy.conf and fill in real
+# values — never commit deploy.conf, it is gitignored on purpose).
 #
-# Usage:
+# Usage (run from the repository root):
 #   bin/deploy.sh --help
 #   bin/deploy.sh --dry-run              # print the full plan, no network activity
 #   bin/deploy.sh --stage-only           # build the local release copy and stop (debug)
@@ -24,7 +24,8 @@ set -euo pipefail
 # --- Paths -------------------------------------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+APP_ROOT="$REPO_ROOT/apps/web"
 CONFIG_FILE="${DEPLOY_CONFIG_FILE:-$APP_ROOT/deploy.conf}"
 CONFIG_EXAMPLE_FILE="$APP_ROOT/deploy.conf.example"
 
@@ -87,9 +88,9 @@ Options:
   --help, -h      Show this help and exit.
 
 Configuration:
-  Copy deploy.conf.example to deploy.conf (in this directory's parent,
-  apps/web/) and fill in real values. deploy.conf is gitignored and must
-  never be committed or uploaded to the remote host.
+  Copy apps/web/deploy.conf.example to apps/web/deploy.conf and fill in real
+  values. deploy.conf is gitignored and must never be committed or uploaded
+  to the remote host.
 EOF
 }
 

@@ -200,3 +200,69 @@ button:hover,
     padding: 0.75rem 1.25rem;
     margin-bottom: 1rem;
 }
+
+/* --- Compact grouped rows (recipe form: quantity + unit [+ type]) --- */
+
+.quantity-unit-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+
+.quantity-unit-row .field {
+    flex: 2 1 12rem;
+    min-width: 0;
+}
+
+.quantity-unit-row .field--unit,
+.quantity-unit-row .field--type {
+    flex: 1 1 8rem;
+}
+
+.quantity-unit-row .field--abv {
+    flex: 1 1 8rem;
+}
+
+.quantity-unit-row .field label,
+.quantity-unit-row .field input,
+.quantity-unit-row .field select {
+    margin-bottom: 0.5rem;
+}
+
+/* --- Hint text --- */
+
+.field-hint {
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    margin: -0.25rem 0 1rem;
+}
+
+.field-hint-inline {
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+/* --- Live ABV estimate output --- */
+
+#abv-estimate {
+    display: inline-block;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--color-accent);
+    padding: 0.5rem 0;
+}
+
+/* --- Ingredient rows --- */
+
+.ingredient-fieldset {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+#add-ingredient-row {
+    margin-bottom: 1rem;
+}

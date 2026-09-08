@@ -23,17 +23,86 @@ deferred" below).
 
 A recipe belongs to exactly one user (its owner) and describes how to make a
 batch of something: a name, a category (`beer`, `wine`, `mead`, `cider`, or
-`other`), free-text description/notes, target original and final gravity,
-and quantities/units for batch size, water, sugar (plus sugar type), and
-yeast (plus yeast type). A recipe has an ordered list of **ingredients**
-(name, an ingredient type of `fruit`/`grain`/`hop`/`other`, quantity, unit,
-and an optional timing note such as "boil 60 min"), edited as a set — saving
-a recipe's ingredient list replaces the whole list rather than diffing
-individual rows.
+`other`), free-text description/notes (optional — the create/edit form
+labels it "(optional)" and never implies it's required), target original and
+final gravity, and quantities/units for batch size, water, sugar (plus sugar
+type), and yeast (plus yeast type). A recipe has an ordered list of
+**ingredients** (name, an ingredient type of `fruit`/`grain`/`hop`/`other`,
+quantity, unit, and an optional timing note such as "boil 60 min"), edited as
+a set — saving a recipe's ingredient list replaces the whole list rather than
+diffing individual rows.
 
 Only the owner can create, edit, delete, or toggle the visibility of a
 recipe. Deleting a recipe cascades to its ingredients and to any batches
 brewed from it (which in turn cascades to their log entries).
+
+#### Batch size vs. water quantity
+
+These are two deliberately distinct fields, easy to conflate: **Batch Size**
+is the total finished-product volume the recipe yields (e.g. "20 L" of
+finished beer/wine/mead/cider), while **Water Quantity** is the water
+actually used during the process, which is normally somewhat larger than the
+batch size since some is lost to boil-off and grain/fruit absorption along
+the way. The create/edit form carries a short inline hint next to these two
+fields clarifying the distinction, since nothing about the field names alone
+makes it obvious.
+
+#### Constrained units and types
+
+Every quantity field on a recipe pairs with a unit, and two fields
+(`sugar_type`, `yeast_type`) carry a type. As of the form simplification,
+all of these are closed-list selections rather than free text, presented as
+`<select>` dropdowns and validated server-side the same way `category` and
+`ingredient_type` already were:
+
+- **Units** (`batch_size_unit`, `water_unit`, `sugar_unit`, and each
+  ingredient row's `unit`): `L`, `mL`, `gal`, `qt`, `kg`, `g`, `lb`, `oz`.
+- **Yeast unit** (`yeast_unit`, a narrower subset since yeast is rarely
+  measured in liters): `packet`, `g`, `mL`.
+- **Sugar type** (`sugar_type`): `table_sugar`, `dextrose`, `honey`, `dme`,
+  `lme`, `other`.
+- **Yeast type** (`yeast_type`): `ale`, `lager`, `wine`, `champagne`,
+  `wild`, `other`.
+
+Unlike `category`/`ingredient_type` (which are non-nullable columns with a
+non-null `'other'` default, both at the app layer and via a database
+`ENUM`), these unit/type columns are **nullable** and have **no database-level
+`ENUM` constraint** — the closed lists are enforced only in
+`RecipeController`. Submitting an invalid or empty value for any of them
+does not error and does not fall back to a non-null default; it silently
+falls back to `null`, since these columns already support "not specified."
+This is an app-layer-only design choice (narrower blast radius, no schema
+migration) rather than an oversight.
+
+**Known, intentional tradeoff:** because `sugar_type`/`yeast_type` used to be
+free text, some existing recipes may have values outside the new closed
+lists (for example, a specific yeast strain name like `"US-05"` rather than
+one of `ale`/`lager`/`wine`/`champagne`/`wild`/`other`). Such a value is
+still stored and still displayed wherever it's simply read back, but the
+edit form's dropdown cannot pre-select it (no matching option exists), and
+re-saving that recipe through the edit form will replace it with whatever
+the dropdown was actually showing (typically blank/`null`) — the original
+out-of-list value is lost on that save. This is a deliberate, accepted
+product tradeoff of moving from free text to a closed list, not a bug to be
+fixed.
+
+#### Target gravity range and estimated ABV
+
+`target_og`/`target_fg` (target original/final specific gravity) remain
+optional, but when provided must fall within the inclusive range **0.990 to
+1.300**, validated both by the browser (`type="number" step="0.001"
+min="0.990" max="1.300"`) and, authoritatively, server-side in
+`RecipeController::validateRecipe()` — a value outside that range, or a
+non-numeric value, is rejected with a validation error rather than saved;
+an empty/absent value is still accepted, since both fields stay optional.
+
+The recipe form also shows a live estimated ABV (alcohol by volume) as the
+user types, using the standard homebrew approximation
+`ABV% ≈ (OG − FG) × 131.25` when a final gravity is present, or the
+"potential"/maximum ABV assuming full attenuation to FG 1.000
+(`(OG − 1.000) × 131.25`) when it isn't. This is a client-side, progressive
+enhancement (see `architecture.md`) — it never blocks form submission and
+has no effect on what's actually validated/stored server-side.
 
 ### Batches (shown to users as "Diaries")
 

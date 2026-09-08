@@ -7,7 +7,9 @@ single app lives under `apps/web/`: plain PHP source (PSR-4 autoloaded under
 the `App\` namespace), plain PHP-include templates, plain SQL migrations, and
 a MySQL/MariaDB database accessed through PDO. There is no client-side
 JavaScript framework, no build step, and no ORM — deliberately, given the
-app's size.
+app's size. There is exactly one client-side JavaScript file in the whole
+app, `public/js/recipe-form.js` (see "Client-side JavaScript" below); every
+other page is plain server-rendered HTML with zero JS.
 
 Request lifecycle: a web server (or `php -S`) routes every request to
 `apps/web/public/index.php`, the single front controller. It bootstraps
@@ -96,8 +98,38 @@ distinct "Recipes" and "Diaries" links (routing to each domain's own-listing
 view) plus conditional Login/Register vs. Logout controls based on whether
 the current request has an authenticated user attribute. `public/css/app.css`
 is a single plain, functional stylesheet (nav, container, forms, buttons,
-`.card-grid`/`.card` for the homepage and list views, `.form-errors`) — there
-is no separate "parchment/journal" decorative theme (see Non-goals below).
+`.card-grid`/`.card` for the homepage and list views, `.form-errors`, plus a
+small "compact grouped rows" block for the recipe form's quantity+unit
+groupings and hint text) — there is no separate "parchment/journal"
+decorative theme (see Non-goals below).
+
+### Client-side JavaScript
+
+`public/js/recipe-form.js` is the app's one and only client-side script — a
+small, framework-free, build-step-free vanilla-JS file, loaded via a plain
+`<script src="/js/recipe-form.js" defer>` only from the recipe create/edit
+template (`templates/pages/recipes/form.php`). It does two narrowly-scoped
+things, both progressive enhancements that the form works correctly without:
+
+- **Add-ingredient row cloning** — clicking `#add-ingredient-row` clones an
+  inert `<template>` block already rendered by the server, re-indexes its
+  `id`/`label[for]` attributes, and appends it to `#ingredient-rows`, so a
+  user can add more than the default 3 rendered ingredient rows without a
+  page reload. `name="ingredient_*[]"` attributes are left untouched
+  (they're PHP array fields paired by array position server-side, not by a
+  shared index).
+- **Live ABV estimate** — on `input` events on the target-OG/target-FG
+  fields, computes and writes an estimated ABV percentage into an
+  `<output id="abv-estimate">` element, per the formula in
+  `business-logic.md`.
+
+Both behaviors no-op safely if their expected DOM elements are missing, and
+the form remains fully functional and submittable with JavaScript disabled
+(verified manually — a static form renders the default 3 ingredient rows and
+a static ABV placeholder, and still submits and persists correctly). There is
+still no JS framework, no bundler/build step, and no other page in the app
+loads any script — this remains a deliberately minimal, single-purpose
+addition, not the start of a client-side architecture shift.
 
 ## Data layer (`App\Db`)
 
@@ -188,7 +220,7 @@ time, in the service layer, not just by hiding the resource from listings:
 
 ## Deployment tooling (ops-only, outside the `App\` application)
 
-`apps/web/bin/deploy.sh` is a standalone bash script for pushing a release to
+`bin/deploy.sh` (at the repository root, invoked from there) is a standalone bash script for pushing a release to
 a generic PHP/MySQL shared-hosting target over SSH/SFTP with password
 authentication. It is deliberately **not** part of the `App\` PSR-4
 application — it never runs on the server, is not autoloaded, has no unit

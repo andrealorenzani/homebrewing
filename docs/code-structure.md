@@ -1,25 +1,35 @@
 # Code Structure
 
 Everything application-specific lives under `apps/web/`. The repository root
-otherwise holds only `README.md`, `CHANGELOG.md`, `original_prompts.md`,
-`docs/` (this directory), and `docs/plans/` (planning/history records).
+otherwise holds `README.md`, `CHANGELOG.md`, `original_prompts.md`, `docs/`
+(this directory), `docs/plans/` (planning/history records), and `bin/`
+(repository-root ops tooling — currently just `deploy.sh`; see below).
 
 ```
+bin/                        Repository-root ops tooling, run from the repo
+│                           root — not part of the App\ application.
+└── deploy.sh                Ops-only SFTP/SSH deploy script (see
+                              "Deployment tooling" below).
 apps/web/
 ├── public/                 Web-accessible document root — the ONLY directory
 │                           that should be exposed to a web server.
 │   ├── index.php           Front controller: builds Config, Kernel, Request;
 │                           dispatches; emits the Response.
-│   └── css/app.css         Single plain functional stylesheet.
+│   ├── css/app.css         Single plain functional stylesheet.
+│   └── js/recipe-form.js   The app's only client-side script: vanilla JS,
+│                           no framework/build step, progressive enhancement
+│                           for the recipe form (add-ingredient-row cloning +
+│                           live ABV estimate). See architecture.md.
 ├── src/                    PSR-4 autoloaded under App\, organized by domain.
 ├── templates/              Plain PHP-include view templates.
 ├── db/migrations/          Numbered, plain-SQL migration files.
-├── bin/                    CLI entry points: migrate.php (migration runner,
-│                           part of App\) and deploy.sh (ops-only SFTP/SSH
-│                           deploy script — not part of the App\ application;
-│                           see "Deployment tooling" below).
+├── bin/                    CLI entry point: migrate.php (migration runner,
+│                           part of App\). The deploy script lives at the
+│                           repository root's bin/deploy.sh instead — see
+│                           above and "Deployment tooling" below.
 ├── deploy.conf.example     Committed template for deploy.conf (gitignored;
-│                           read by bin/deploy.sh). Mirrors .env/.env.example.
+│                           read by the repo-root bin/deploy.sh). Mirrors
+│                           .env/.env.example.
 ├── docker-compose.yml      Local MySQL 8.0 for dev/integration tests.
 ├── docker/mysql-init/      First-boot SQL (creates app user + both DBs).
 ├── tests/
@@ -99,10 +109,20 @@ apps/web/
   visibility (`viewForUser()`), ownership enforcement (`requireOwned()`,
   used by edit/delete/toggle), `recentPublic()` for the homepage. Holds the
   `CATEGORIES`/`INGREDIENT_TYPES` constants that must stay in sync with the
-  `ENUM(...)` definitions in the recipes/recipe_ingredients migrations.
+  `ENUM(...)` definitions in the recipes/recipe_ingredients migrations, plus
+  `UNITS`/`YEAST_UNITS`/`SUGAR_TYPES`/`YEAST_TYPES` (app-layer-only closed
+  lists, no matching DB `ENUM` — see `data-model.md`/`business-logic.md`)
+  and `TARGET_GRAVITY_MIN`/`TARGET_GRAVITY_MAX` (`0.990`/`1.300`).
 - `RecipeController.php` — HTTP glue: `listOwn`, `showCreateForm`/`create`,
   `show` (dual-mode: owner/other/anonymous), `showEditForm`/`update`,
-  `delete`, `toggleVisibility`.
+  `delete`, `toggleVisibility`. `parseRecipeDataFromRequest()`/
+  `parseIngredientsFromRequest()` validate every `*_unit`/`*_type` field
+  against `RecipeService`'s closed lists via a `nullableInList()` helper,
+  falling back to `null` (not a non-null default) on an invalid/empty value,
+  since these are nullable columns; `validateRecipe()` additionally
+  range-checks `target_og`/`target_fg` against `TARGET_GRAVITY_MIN`/`MAX`.
+  `MIN_INGREDIENT_ROWS` (currently `3`) drives how many blank ingredient
+  rows `buildIngredientRows()` pads a form up to.
 - `Exception/` — `RecipeNotFoundException` (used both for "doesn't exist"
   and "exists but private and not yours" — the source of the 404-not-403
   behavior), `RecipeAccessDeniedException` (a genuine ownership violation on
@@ -152,7 +172,10 @@ on first use, and provides small private controller factories
 - `pages/auth/{login,register}.php`
 - `pages/home.php` — the homepage's public-recipe card grid.
 - `pages/recipes/{index,show,form}.php` — own-list, detail (dual-mode), and
-  a single shared create/edit form template.
+  a single shared create/edit form template. `form.php` renders every
+  `*_unit`/`*_type` field as a `<select>` sourced from `RecipeService`'s
+  constant lists, groups quantity+unit(+type) fields into compact rows, and
+  is the only template that loads `public/js/recipe-form.js`.
 - `pages/batches/{index,show,form,log_entry_form}.php` — own-list, detail
   (with the day-numbered diary timeline), shared create/edit batch form, and
   the shared add/edit log-entry form.
@@ -168,19 +191,21 @@ See `data-model.md` for exact columns.
 
 ## `bin/`
 
-- `migrate.php` — part of the `App\` application: reads `.env` (or
-  `.env.testing` under `APP_ENV=testing`) and runs
+- `apps/web/bin/migrate.php` — part of the `App\` application: reads `.env`
+  (or `.env.testing` under `APP_ENV=testing`) and runs
   `MigrationRunner::migrate()` against it.
-- `deploy.sh` — **ops-only tooling, not part of the `App\` application**: a
-  standalone bash script that stages a production release locally
-  (`composer install --no-dev --optimize-autoloader`), backs up and uploads
-  it to a shared-hosting target via SSH/SFTP, runs `bin/migrate.php`
-  remotely, and optionally verifies + auto-rolls-back on a failing health
-  check. Reads its configuration from the gitignored `deploy.conf` (template:
-  `deploy.conf.example`). See `architecture.md`'s "Deployment tooling"
-  section and `README.md`'s "Automated redeploys with `bin/deploy.sh`"
-  section for full details; it is excluded from every release it itself
-  uploads and has no PHPUnit coverage of its own (see `test-suites.md`).
+- Repository-root `bin/deploy.sh` — **ops-only tooling, not part of the
+  `App\` application, and not under `apps/web/`**: a standalone bash script,
+  run from the repository root, that stages a production release locally
+  from `apps/web` (`composer install --no-dev --optimize-autoloader`), backs
+  up and uploads it to a shared-hosting target via SSH/SFTP, runs
+  `bin/migrate.php` remotely, and optionally verifies + auto-rolls-back on a
+  failing health check. Reads its configuration from the gitignored
+  `apps/web/deploy.conf` (template: `apps/web/deploy.conf.example`). See
+  `architecture.md`'s "Deployment tooling" section and `README.md`'s
+  "Automated redeploys with `bin/deploy.sh`" section for full details; it is
+  excluded from every release it itself uploads and has no PHPUnit coverage
+  of its own (see `test-suites.md`).
 
 ## `tests/`
 

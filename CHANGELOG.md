@@ -2,6 +2,60 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.4 — 2026-09-08
+
+Recipe form simplification and validation release, plus a deploy-tooling
+relocation. The data model and routes are unchanged — this tightens the
+create/edit recipe UX and moves an ops script to a more conventional
+location.
+
+Added:
+
+- Recipe create/edit form: every unit field (`batch_size_unit`,
+  `water_unit`, `sugar_unit`, `yeast_unit`, and each ingredient row's unit)
+  and every type field (`sugar_type`, `yeast_type`) is now a constrained
+  `<select>` dropdown instead of free text, backed by new `RecipeService`
+  constants (a shared brewing-units list reused across most unit fields,
+  with yeast using its own narrower `packet`/`g`/`mL` list; fixed
+  `sugar_type`/`yeast_type` option sets) and validated server-side the same
+  way `category`/`ingredient_type` already were — an invalid or empty
+  submitted value falls back to `null` (these are nullable columns), not a
+  hard rejection.
+- An inline hint on the form clarifying Batch Size (the recipe's total
+  finished-product yield) versus Water Quantity (the water actually used,
+  since some is lost to boil-off and grain absorption) — the two were
+  previously easy to confuse.
+- `target_og`/`target_fg` are now range-constrained to 0.990–1.300
+  (validated both client-side via HTML5 `min`/`max`/`step` and
+  server-side), and the form shows a live-updating estimated ABV figure as
+  the user types, using the standard `(OG − FG) × 131.25` formula (or
+  potential ABV assuming full attenuation to 1.000 if FG isn't filled in
+  yet). This is the app's first client-side JavaScript
+  (`apps/web/public/js/recipe-form.js`) — a small, unobtrusive vanilla-JS
+  progressive enhancement, no framework, no build step; the form remains
+  fully functional and submittable with JavaScript disabled.
+- Ingredient rows now default to 3 visible rows (down from 6), with a
+  client-side "Add ingredient" button to append more as needed, instead of
+  always rendering a long block of mostly-blank rows.
+- The Description field no longer visually implies it's required, and the
+  form's quantity/unit/type fields are grouped into compact side-by-side
+  rows instead of a long vertical stack.
+
+Changed:
+
+- `bin/deploy.sh` moved from `apps/web/bin/deploy.sh` to the repository
+  root (`bin/deploy.sh`); it's now invoked from the repo root instead of
+  `apps/web/`. `apps/web/bin/migrate.php` is unaffected. `README.md` and
+  `/docs` updated to reference the new location.
+
+Explicitly not included in this release: no database schema/migration
+changes (the new unit/type constraints are enforced at the application
+layer, not via new `ENUM` columns); existing recipes with free-text
+`sugar_type`/`yeast_type` values outside the new fixed lists (e.g. a
+specific yeast strain name) will lose that exact value if re-saved through
+the edit form, since it can no longer be represented in the closed
+dropdown — a known, accepted tradeoff of moving to constrained selection.
+
 ## 1.0.3 — 2026-09-08
 
 Bug-fix release. Both fixes were discovered during the user's first real

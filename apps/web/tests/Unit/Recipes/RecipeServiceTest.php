@@ -290,6 +290,18 @@ final class RecipeServiceTest extends TestCase
         $service->toggleVisibility(999, 1);
     }
 
+    // --- Constrained value-list constants ---
+
+    public function testConstrainedValueListConstants(): void
+    {
+        $this->assertSame(['L', 'mL', 'gal', 'qt', 'kg', 'g', 'lb', 'oz'], RecipeService::UNITS);
+        $this->assertSame(['packet', 'g', 'mL'], RecipeService::YEAST_UNITS);
+        $this->assertSame(['table_sugar', 'dextrose', 'honey', 'dme', 'lme', 'other'], RecipeService::SUGAR_TYPES);
+        $this->assertSame(['ale', 'lager', 'wine', 'champagne', 'wild', 'other'], RecipeService::YEAST_TYPES);
+        $this->assertSame(0.990, RecipeService::TARGET_GRAVITY_MIN);
+        $this->assertSame(1.300, RecipeService::TARGET_GRAVITY_MAX);
+    }
+
     public function testRecentPublicExcludesPrivateRecipesAndRespectsLimit(): void
     {
         $service = $this->makeService();

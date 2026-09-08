@@ -68,7 +68,18 @@ drops. Always check the run summary's skip count is `0` before trusting a
   private → public again) actually changes read-access behavior each time,
   not just once. Also: ingredient-set replace-on-save, category/type
   fallback-to-`other` for unrecognized values, CRUD status codes
-  (200/302/403/404/422) for every action and actor.
+  (200/302/403/404/422) for every action and actor. Also (v1.0.4): every
+  `*_unit`/`sugar_type`/`yeast_type` field (plus each ingredient row's
+  `unit`) falls back to `null` on an invalid/empty submitted value;
+  `target_og`/`target_fg` boundary behavior (0.990/1.300 accepted,
+  0.989/1.301 rejected with a validation error, non-numeric rejected,
+  empty/absent still accepted); the create form renders exactly
+  `MIN_INGREDIENT_ROWS` (3) blank ingredient rows and an edit form with more
+  than 3 existing ingredients renders all of them without truncation;
+  structural assertions that the create/edit form has no remaining free-text
+  `*_unit`/`*_type` inputs, renders the correct `<select>` options, the
+  compact grouped-row markup, the OG/FG HTML5 constraints + ABV output
+  element, and the add-ingredient button/script tag.
 - **Batches / diaries** — the same authorization matrix as Recipes, plus:
   correct day-number computation (day 0 on the start date, positive after,
   negative for a backdated pre-start entry, time-component ignored); log
@@ -96,10 +107,10 @@ drops. Always check the run summary's skip count is `0` before trusting a
 
 ## Current suite stats (last verified run)
 
-**369 tests, 676 assertions, 0 failures, 0 skips.**
+**397 tests, 748 assertions, 0 failures, 0 skips.**
 
-Coverage (whole-suite): **85.19% classes** (23/27), **97.53% methods**
-(237/243), **99.14% lines** (1154/1164).
+Coverage (whole-suite): **85.19% classes** (23/27), **97.54% methods**
+(238/244), **99.16% lines** (1184/1194).
 
 Two classes are intentionally accepted below 85% on methods (while still
 comfortably clearing it on lines), and are not considered gaps:
@@ -116,7 +127,10 @@ comfortably clearing it on lines), and are not considered gaps:
   triggers since it never throws mid-transaction; the realistic failure mode
   (a real MySQL constraint violation mid-transaction) is exercised
   indirectly by other integration tests' FK/constraint behavior, not by a
-  forced fault injected specifically to hit this line.
+  forced fault injected specifically to hit this line. This percentage is
+  unchanged by the recipe-form simplification (v1.0.4): `RecipeController`,
+  which absorbed that release's new validation/fallback logic, is at 100%
+  methods/lines.
 
 ## Running the suite
 
@@ -166,7 +180,7 @@ genuinely exercising real MySQL.
 
 ## Deployment tooling (`bin/deploy.sh`) — not part of the PHPUnit suite
 
-`apps/web/bin/deploy.sh` is a standalone ops script, not `App\`-namespaced
+`bin/deploy.sh` (repository root, run from there) is a standalone ops script, not `App\`-namespaced
 PHP code, so no PHPUnit coverage percentage applies to it and it is not
 counted in the suite stats above. Its correctness is instead verified
 manually/end-to-end against a throwaway target: a disposable
@@ -184,3 +198,16 @@ release, and a password containing `$`/a space to catch shell-quoting bugs.
 isn't installed on the host) is also part of this verification. These runs
 are recorded as the "done when" evidence in the plan file that introduced
 the script, not as an ongoing automated CI check.
+
+## Client-side JavaScript (`public/js/recipe-form.js`) — not part of the PHPUnit suite
+
+Like `bin/deploy.sh`, `public/js/recipe-form.js` is not `App\`-namespaced PHP
+code, so it carries no PHPUnit coverage percentage and isn't counted in the
+suite stats above (there is no JS test tooling anywhere in this repo). Its
+correctness is verified manually in a real browser instead, covering: the
+"Add ingredient" button appending a working, correctly-indexed blank row; the
+live ABV estimate updating for both an FG-present and an FG-absent OG/FG
+combination; and the create form remaining fully fillable and submittable
+end to end with JavaScript disabled in the browser. This manual-verification
+transcript is recorded as "done when" evidence in the plan file that
+introduced the script, not as an ongoing automated check.
